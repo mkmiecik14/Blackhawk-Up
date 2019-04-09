@@ -6,11 +6,6 @@ output:
   html_document:
     highlight: zenburn
     theme: journal
-    toc: no
-    toc_depth: 3
-    toc_float:
-      collapsed: yes
-      smooth_scroll: yes
 ---
 
 ```{r setup, include=F}
@@ -60,7 +55,7 @@ Patrick "Showtime" Kane. The breaker of records, the daddy of dangles, the light
 
 Kane seems to score in clutch moments -- at times when his team needs a big showtime play from a franchise leading player. I wanted to see whether my anecdotal observations of Kane's scoring at critical game moments -- namely, the final minutes of the third period -- were characteristically different from other times in the game.
 
-The following depicts an analysis of Kane's career regular season scoring tendencies in all three periods (overtime goals excluded from analysis). These data were retrieved from [Hockey Reference](https://www.hockey-reference.com/) and analyses were performed/plotted in R (all code available [here](LINK TO GITHUB HERE)).
+The following depicts an analysis of Kane's career regular season scoring tendencies in all three periods (overtime goals excluded from analysis). These data were retrieved from [Hockey Reference](https://www.hockey-reference.com/) and analyses were performed/plotted in R (all code available [here](https://github.com/mkmiecik14/Blackhawk-Up).
 
 Like a fine wine, Patrick Kane is getting better with age. With each passing year, Kane is scoring more goals.
 
@@ -83,7 +78,7 @@ ggplot(pkane_data_sum, aes(Season_Begin, n)) +
        ) +
   scale_x_continuous(breaks = seq(min(pkane_data_sum$Season_Begin),
                                   max(pkane_data_sum$Season_Begin),
-                                  2)
+                                  1)
                      ) +
   theme_minimal()
 
@@ -148,7 +143,7 @@ ggplot(pkane_data %>% filter(Period %in% c("1", "2", "3")),
   scale_color_brewer(palette = "Dark2") +
   theme_minimal() +
   theme(legend.position = "bottom") +
-  facet_wrap(~Season_Begin)
+  facet_wrap(~Season)
 ```
 
 The above plot depicts Kane's scoring density across each regular season period. A few patterns emerge -- namely, the 2016-2017 through 2018-2019 seasons experience a steady increase in late third period goals. Also, Kane's first and third period scoring tendencies track well with each other, while the second period is characteristically different with increased scoring in early and middle portions.
