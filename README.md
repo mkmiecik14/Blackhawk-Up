@@ -4,4 +4,4 @@ Any code that is featured in my [Blackhawk Up](https://blackhawkup.com/) posts w
 
 ## Published posts:
 
-+ Post 1 goes here with link to specific RMARKDOWN.
++ [Chicago Blackhawks: analyzing Patrick Kane’s career scoring tendencies](Chicago Blackhawks: analyzing Patrick Kane’s career scoring tendencies) -- see the `RMarkdown` [here](https://github.com/mkmiecik14/Blackhawk-Up/blob/master/post-blackhawkup-kane-career-scoring-1.Rmd) -- Published 09 April 2019
