@@ -1,0 +1,156 @@
+---
+title: "Patrick Kane's Career Scoring Tendencies from 2007-2019"
+author: "Matt Kmiecik"
+date: "FINAL PUB DATE HERE"
+output:
+  html_document:
+    highlight: zenburn
+    theme: journal
+    toc: no
+    toc_depth: 3
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+---
+
+```{r setup, include=F}
+knitr::opts_chunk$set(echo = TRUE, 
+                      warning = FALSE, 
+                      message = FALSE,
+                      fig.path = "Patrick-Kanes-Career-Scoring-Tendencies/"
+                      )
+options(knitr.table.format = 'html') # For the html tables
+```
+
+```{r, pkgs}
+pkgs <- c("tidyverse", "readxl", "RColorBrewer", "httr")
+xfun::pkg_attach(pkgs)
+```
+
+```{r, prepro}
+# Loading & prepping data ----
+first_half <- c("Oct", "Nov", "Dec")
+# second_half <- c("Jan", "Feb", "March", "Apr")
+
+# Importing reading data
+# From: https://community.rstudio.com/t/read-xlsx-from-github/9386/3
+# See the above link for how I got the code to read in 
+# an Excel file into R from Github
+github_link <- "https://github.com/mkmiecik14/mkmiecik14.github.io/blob/master/data/pkane-goals.xlsx?raw=true"
+temp_file <- tempfile(fileext = ".xlsx")
+req <- GET(github_link, write_disk(path = temp_file))
+
+pkane_data <- readxl::read_excel(temp_file) %>%
+  mutate(Time = as.numeric(format(Time, format = "%H.%M"))) %>%
+  # filter(Date < as.Date("2018-09-01")) %>% # filters out 2018-2019 season 
+  mutate(Period = fct_relevel(Period, c("1", "2", "3", "OT")),
+         Weekday = lubridate::wday(Date, label = TRUE),
+         Month = lubridate::month(Date, label = TRUE),
+         Year = lubridate::year(Date),
+         Season = ifelse(Month %in% first_half, 
+                         paste0(Year, "-", Year + 1), 
+                         paste0(Year - 1, "-", Year)
+                         )
+         ) %>%
+  separate(Season, into = c("Season_Begin", "Season_End"), remove = FALSE) %>%
+  mutate_at(vars(Season_Begin, Season_End), as.numeric)
+```
+
+Patrick "Showtime" Kane. The breaker of records, the daddy of dangles, the lighter of lamps. No matter what you call him, Kaner has had a tremendous year and deserving of some hardware at the end of the season.
+
+Kane seems to score in clutch moments -- at times when his team needs a big showtime play from a franchise leading player. I wanted to see whether my anecdotal observations of Kane's scoring at critical game moments -- namely, the final minutes of the third period -- were characteristically different from other times in the game.
+
+The following depicts an analysis of Kane's career regular season scoring tendencies in all three periods (overtime goals excluded from analysis). These data were retrieved from [Hockey Reference](https://www.hockey-reference.com/) and analyses were performed/plotted in R (all code available [here](LINK TO GITHUB HERE)).
+
+Like a fine wine, Patrick Kane is getting better with age. With each passing year, Kane is scoring more goals.
+
+```{r, total-goals}
+# How many goals did Kane score overall?
+pkane_data_sum <- pkane_data %>% count(Season_Begin)
+total_goals <- sum(pkane_data_sum$n)
+
+rdgy_pal <- brewer.pal(11, "RdGy")
+ggplot(pkane_data_sum, aes(Season_Begin, n)) +
+  geom_smooth(method = "lm", se = TRUE, level = .95, 
+              color = rdgy_pal[3], fill = rdgy_pal[7]
+              ) +
+  geom_point() +
+  geom_path(aes(group = 1), linetype = 2, alpha = 1/3) +
+  labs(x = "Season (Beginning Year)", 
+       y = "Number of Goals",
+       caption = "Shading denotes 95% confidence interval.",
+       title = "Patrick Kane's Career Regular Season Goals"
+       ) +
+  scale_x_continuous(breaks = seq(min(pkane_data_sum$Season_Begin),
+                                  max(pkane_data_sum$Season_Begin),
+                                  2)
+                     ) +
+  theme_minimal()
+
+# Is there a linear relationship across time?
+kane_mod <- summary(lm(n~Season_Begin, data = pkane_data_sum))
+#cor.test(pkane_data_sum$Season_Begin, pkane_data_sum$n)
+#library(broom)
+#augment(lm(n~Season_Begin, data = pkane_data_sum))
+```
+
+The above plot depicts a significant linear increase in goals scored for each season played. More specifically, this model predicts an increase in 1.44 goals for each season played. Accordingly, Kane is predicted to score 39 goals next season.
+
+Although this gives us a nice overview of career goals across his NHL season, what about *when* he scores his goals? Are there specific times in a period that he scores more or less often? 
+
+```{r, period-goals}
+# Goals overall by period ----
+bwidth  <- 1
+ggplot(pkane_data %>% filter(Period %in% c("1", "2", "3")), aes(Time)) +
+  geom_density() +
+  geom_rug(aes(y = 0), position = position_jitter(width = .15, height = 0)) +
+  labs(x = "Period Time (min)", 
+       y = "Goal Density", 
+       caption = paste0("Binwidth = ", bwidth, " min."),
+       title = "Patrick Kane's Scoring Density Across the Period"
+       ) +
+  theme_minimal() 
+```
+
+The above density plot suggests that Kane initially scores a good proportion of his goals around the 5th minute, while the majority of the goals are scored in the last 5 minutes of the period. So far, this is aligning with my anecdotal experience with watching Kane -- he tends to score towards the end of the period.
+
+The above plot, however, doesn't take into account the three periods. Each period has it's own unique properties, such as the long change in the second period and the sense of urgency in the third, especially if a team is trailing. Therefore, does the scoring density change depending on the period?
+
+```{r, periodwise-density}
+# Period density ----
+ggplot(pkane_data %>% filter(Period %in% c("1", "2", "3")), 
+       aes(Time, group = Period, color = Period)
+       ) +
+  geom_density() +
+  labs(x = "Period Time (min)",
+       y = "Goal Density",
+       title = "Patrick Kane's Scoring Density Across Each Period"
+       ) +
+  scale_color_brewer(palette = "Dark2") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+Indeed it does! Kane's second period scoring tendencies are much different than the first and the third periods. Kane tends to score early in the second, while late in the first, and even later in the third. Scoring close to the period's end, especially in the third period, creates much excitement for the fans and momentum for the team.
+
+Furthermore, we can break this up by season.
+
+```{r, season-density}
+# Density across season
+ggplot(pkane_data %>% filter(Period %in% c("1", "2", "3")), 
+       aes(Time, group = Period, color = Period)
+       ) +
+  geom_density() +
+  labs(x = "Period Time (min)", 
+       y = "Goal Density",
+       title = "Patrick Kane's Career Periodwise Scoring Density"
+       ) +
+  scale_color_brewer(palette = "Dark2") +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  facet_wrap(~Season_Begin)
+```
+
+The above plot depicts Kane's scoring density across each regular season period. A few patterns emerge -- namely, the 2016-2017 through 2018-2019 seasons experience a steady increase in late third period goals. Also, Kane's first and third period scoring tendencies track well with each other, while the second period is characteristically different with increased scoring in early and middle portions.
+
+Patrick Kane, both anecdotally and numerically, is a clutch goal scorer. Kane scores the majority of his goals late in the first period, very late in the third, but early in the second. "Showtime" earned his stars not only through his prowess with top-corn level snipes, but also by *when* he lights the lamp. 
