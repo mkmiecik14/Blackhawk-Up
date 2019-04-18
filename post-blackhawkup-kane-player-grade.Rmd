@@ -1,0 +1,290 @@
+---
+title: "Patrick Kane's Player Grade"
+author: "Matt Kmiecik"
+output:
+  html_document:
+    highlight: zenburn
+    theme: journal
+---
+
+```{r setup, include=F}
+knitr::opts_chunk$set(echo = TRUE, 
+                      warning = FALSE, 
+                      message = FALSE,
+                      fig.align = "center",
+                      fig.path = "Patrick-Kanes-Player-Grade/"
+                      )
+options(knitr.table.format = 'html') # For the html tables
+```
+
+These are the packages used for this analysis:
+
+```{r, pkgs}
+pkgs <- c("Hmisc", "tidyverse", "readxl", "RColorBrewer", "httr", "broom", "datapasta")
+xfun::pkg_attach(pkgs)
+```
+
+Here is the color palette information and a table for nice plotting:
+
+```{r}
+# Color palette
+rdgy_pal <- brewer.pal(11, "RdGy") # display.brewer.pal(11, "RdGy")
+
+meas_names <- tibble(meas = c("a",
+                              "pts",
+                              "ev",
+                              "pp",
+                              "gw",
+                              "eva",
+                              "ppa",
+                              "s",
+                              "tsa",
+                              "blk",
+                              "hit",
+                              "tk",
+                              "gv",
+                              "toi",
+                              "g"
+                              ),
+                     name = c("Assists", 
+                              "Points", 
+                              "Even-Strength Goals", 
+                              "Powerplay Goals",
+                              "Game Winning Goals",
+                              "Even-Strength Assists",
+                              "Powerplay Assists",
+                              "Shots on Goal",
+                              "Total Shots Attempted",
+                              "Blocks",
+                              "Hits",
+                              "Takeaways",
+                              "Giveaways",
+                              "Time on Ice",
+                              "Goals"
+                              )
+                     )
+
+```
+
+These data were acquired from hockey-reference.com and downloaded from this github repo. The preprocessing steps are outlined below:
+
+```{r, prepro}
+# Loading & prepping data ----
+# From: https://community.rstudio.com/t/read-xlsx-from-github/9386/3
+# See the above link for how I got the code to read in 
+# an Excel file into R from Github
+github_link <- "https://github.com/mkmiecik14/Blackhawk-Up/blob/master/Data/pkane-career-stats.xlsx?raw=true"
+temp_file <- tempfile(fileext = ".xlsx")
+req <- GET(github_link, write_disk(path = temp_file))
+
+pkane_data <- readxl::read_excel(temp_file)
+
+pkane_data_basic <- pkane_data %>%
+  # used to have:
+  #select(season, toi, g, a, pts, ev, pp, gw, eva, ppa, s, tsa, blk, hit, tk, gv) %>%
+  select(season, toi, g, a, pts, s, tsa, blk, hit, tk, gv) %>%
+  mutate_at(vars(g:gv), function(x){x/.$toi}) %>% # controls for time on ice
+  mutate_if(is.numeric, scale) # converts to z scores
+
+pkane_data_long <- pkane_data_basic %>% 
+  gather(meas, value, -season) %>%
+  separate(season, into = c("beg", "end"), remove = FALSE) %>%
+  mutate_at(vars(beg:end), as.numeric) %>%
+  mutate(end = end + 2000)
+
+pkane_mod <- pkane_data_long %>%
+  group_by(meas) %>%
+  do(mod = lm(value~beg, data = .))
+
+pkane_glance <- pkane_mod %>% glance(mod)
+
+pkane_tidy <- pkane_mod %>% 
+  tidy(mod) %>% 
+  filter(term %nin% "(Intercept)") %>%
+  mutate(sig = ifelse(p.value < .05, "yes", "no")) %>%
+  left_join(., meas_names, by = "meas") %>%
+  ungroup()
+
+pkane_data_plot <- pkane_data_long %>% left_join(., pkane_tidy, by = "meas")
+
+# Short names with all meas
+# ggplot(pkane_data_plot, aes(beg, value, group = 1)) +
+#   geom_path() +
+#   geom_smooth(aes(color = sig), method = "lm", se = FALSE) +
+#   theme_minimal() +
+#   scale_color_manual(values = c(rdgy_pal[8], rdgy_pal[3])) +
+#   scale_y_continuous(breaks = c(-2, 0, 2), minor_breaks = FALSE) +
+#   scale_x_continuous(minor_breaks = FALSE) +
+#   labs(x = "Season (beginning year)", 
+#        y = "Scaled Value (z-score)",
+#        caption = "Values were controlled for TOI prior to z-scoring."
+#        ) +
+#   facet_wrap(~meas) +
+#   theme(legend.position = "bottom")
+```
+
+ARTICLE STARTS HERE.
+
+For many Chicago Blackhawks fans it was heartbreaking to see their team miss the playoffs, despite incredible seasons from their top players, like Alex DeBrincat, Jonathan Toews, and healthy bounce-back returns from Corey Crawford. Patrick Kane's season, however, was on another level. Despite facing adversity at every corner this season, Kane's ability to take over a game, play back to back shifts (often into powerplays), and set-up his teammates with precise passes injected hope into the bloodstream of Hawks fans with each passing shift.
+
+Although several Blackhawks players will not be receiving high marks this season, Patrick Kane is certainly deserving of elevated praise for several of his accomplishments during his 2018-2019 campaign. Here are some of his notable achievements (from [Kiki's Keys](https://kikiskeysgame.tumblr.com/post/184183304694/chicago-blackhawks-player-reviews-patrick-kane)):
+
+* Stats: 81 games played, 44 goals, 66 assists, 110 points, +2 rating, 22 PIM, 1822 TOI
+* 20 game point streak
+* Franchise-record 17 game assist streak
+* Career high in points
+* Eighth career NHL All-Star game appearance
+* Immense gratitude from the author
+
+The late November acquisition of Dylan Strome (and Brendan Perlini) from the Arizona Coyotes for Nick Schmatlz generated a solid offensive front on the second line. The Kane-DeBrincat-Strome line was employed frequently (second to Caggiula-Kane-Toews) and combined for 10 points (12.7%) on even-strength bouts (via [Dobber's Frozen Tools](https://frozenpool.dobbersports.com/players/patrick-kane)). This was an exciting line, at times resembling the chemistry of the Kane-Panarin-Anisimov era that combined for 29 points (43.9%) at even strength. I can only imagine the chemistry will improve with offseason training and motivation to improve for next season.
+
+[FAN VOTE TWEET]
+
+[another idea, kane nominated to captain for worlds]
+
+Although Kane had season of career highs, it was also a very different type of season for the Hawks veteran. Coming off a disappointing previous season where the Blackhawks missed the playoffs altogether and a switch in coaching staff/personnel towards the beginning of this season, comparing changes between Kane's statistics provides little context for this season, especially with Kane's elevated time on ice following the Colliton transition. Here is a plot of his career ice time:
+
+```{r, toi}
+ggplot(pkane_data, aes(season, toi)) +
+  geom_path(aes(group = 1)) +
+  labs(x = "Season", 
+       y = "Time on Ice (minutes)",
+       title = "Patrick Kane's Career Time on Ice"
+       ) +
+  theme_minimal()
+```
+
+As we can see above, Kane not only had a career high in ice time, but also his values fluctuate over time, especially with the shortened 2012-2013 season.
+
+Therefore, I wanted to compare Kane's 2018-2019 season with his past seasons to see any performance improvements while controlling for his elevated time on ice. It would be important to do this because, although Kane had a career high in points, it could be that he simply played more, thus leading to more points. However, it would be much more impressive if he was producing more points per minute on the ice compared to previous seasons. The analysis that follows was performed on data retrieved from [Hockey Reference](https://www.hockey-reference.com/) and all `R` code is available on my [Github account](https://github.com/mkmiecik14/Blackhawk-Up).
+
+First, I pulled a variety of basic regular season statistics and divided them by Kane's time on ice each season. I then computed a standardized score--called a [z-score](https://www.statisticshowto.datasciencecentral.com/probability-and-statistics/z-score/)--that allows comparisons between different stats, like goals (apples) to assists (oranges). Finally, I modeled the linear change over time across Kane's carer.
+
+```{r, all-meas}
+# Long names all meas
+ggplot(pkane_data_plot %>% filter(meas %nin% "toi"), aes(beg, value, group = 1)) +
+  geom_path() +
+  geom_smooth(aes(color = sig), method = "lm", se = FALSE) +
+  theme_minimal() +
+  scale_color_manual(values = c(rdgy_pal[8], rdgy_pal[3]),
+                      guide = guide_legend(reverse = T,
+                                          title = "Significant Linear Trend",
+                                          title.position = "top"
+                                          )
+                     ) +
+  scale_y_continuous(breaks = c(-2, 0, 2), minor_breaks = FALSE) +
+  scale_x_continuous(minor_breaks = FALSE) +
+  labs(x = "Season (beginning year)", 
+       y = "Scaled Value (z-score)",
+       caption = "Values were controlled for TOI prior to z-scoring.",
+       title = "Patrick Kane's Career Trends"
+       ) +
+  facet_wrap(~name) +
+  theme(legend.position = "bottom", 
+        legend.key.width = unit(.5, 'in'),
+        legend.key.height = unit(.25, 'in'),
+        legend.title.align = .5
+        )
+```
+
+The above plot is a rich depiction of Kane's career performance to date in the regular season *controlled for the amount of time he spent on the ice*. Additionally, we are able to directly compare statistics to each other via standardized z-scores. 
+
+Compared to his past seasons, Kane had record high shots on goal and total shots attempted per minute of ice time. Furthermore, these two measures have significantly increased across his career. Here is a closer look:
+
+```{r, sig-meas}
+# Sig trends only
+ggplot(pkane_data_plot %>% filter(sig=="yes"), aes(beg, value, group = 1)) +
+  geom_path() +
+  geom_smooth(aes(color = sig), method = "lm", se = FALSE) +
+  theme_minimal() +
+  scale_color_manual(values = rdgy_pal[3]) +
+  scale_y_continuous(breaks = c(-2, 0, 2), minor_breaks = FALSE) +
+  coord_cartesian(ylim = c(-2,2)) +
+  scale_x_continuous(minor_breaks = FALSE) +
+  labs(x = "\n Season (beginning year)", 
+       y = "Scaled Value (z-score)",
+       caption = "Values were controlled for TOI prior to z-scoring.",
+       title = "Patrick Kane's Significant Linear Trends"
+       ) +
+  facet_wrap(~name) +
+  theme(legend.position = "none")
+```
+
+Now let's take a closer look at the measures that were not significant in their linear trend, but pay close attention to trend directions and the position of the line for the 2018-2019 season:
+
+```{r, non-sig-meas}
+# Non-Sig trends only
+ggplot(pkane_data_plot %>% 
+         filter(sig == "no", meas %nin% "toi"), 
+       aes(beg, value, group = 1)
+       ) +
+  geom_path() +
+  geom_smooth(aes(color = sig), method = "lm", se = FALSE) +
+  theme_minimal() +
+  scale_color_manual(values = rdgy_pal[8]) +
+  scale_y_continuous(breaks = c(-2, 0, 2), minor_breaks = FALSE) +
+  #coord_cartesian(ylim = c(-2,2)) +
+  scale_x_continuous(minor_breaks = FALSE) +
+  labs(x = "\n Season (beginning year)", 
+       y = "Scaled Value (z-score)",
+       caption = "Values were controlled for TOI prior to z-scoring.",
+       title = "Patrick Kane's Non-Significant Linear Trends"
+       ) +
+  facet_wrap(~name) +
+  theme(legend.position = "none")
+```
+
+In the above plot, we can see that Kane's assists per minute of ice time were extremely high this season (second highest in his career). Furthermore, we can see that although Kane had a career high in points this season, it was not his highest season in terms of points per minute on the ice. Despite Kane's awesome season, he also recorded a career high in giveaways (54), even when controlled for time on ice.
+
+For a career overview, let's take a look at the steepness of the slopes for the plots above to get a better sense of the level of increase (positive slope) or decrease (negative slope) across his career:
+
+```{r, slopes}
+ggplot(pkane_tidy %>% filter(meas %nin% "toi"), 
+       aes(estimate, reorder(name, estimate), color = sig)
+       ) +
+  geom_errorbarh(aes(xmin = estimate - std.error, xmax = estimate + std.error),
+                 height = .2
+                 ) +
+  geom_point() +
+  scale_x_continuous(minor_breaks = NULL) +
+  scale_color_manual(values = c(rdgy_pal[8], rdgy_pal[3]),
+                     guide = guide_legend(reverse = T,
+                                          title = "Significant Linear Trend",
+                                          title.position = "top"
+                                          )
+                     ) +
+  coord_cartesian(ylim = c(1, 12)) +
+  labs(y = NULL, 
+       x = "\n Regression Estimate (slope)", 
+       caption = "Standard error bars.",
+       title = "Patrick Kane's Trend Comparison"
+       ) +
+  theme_minimal() +
+  theme(legend.position = "bottom", 
+        legend.key.width = unit(.5, 'in'),
+        legend.key.height = unit(.25, 'in'),
+        legend.title.align = .5
+        ) +
+  annotate("rect",
+         xmin = 0,
+         xmax = Inf,
+         ymin = 10,
+         ymax = 12,
+         fill = "#33a02c",
+         alpha = 1/3
+         ) +
+    annotate("rect",
+         xmin = -Inf,
+         xmax = 0,
+         ymin = 10,
+         ymax = 12,
+         fill = "#e31a1c",
+         alpha = 1/3
+         ) +
+  annotate("text", x = .15, y = 11, label = "Increase") +
+  annotate("text", x = -.1, y = 11, label = "Decrease")
+```
+
+The above plot suggests that several of these measures are increasing in value, controlled for ice time, across Kane's career. Most notably, his total shots attempted, shots on goal, goals, points, and giveaways are increasing, while his takeaways are decreasing. Interestingly, Kane's assists per minute are remarkably consistent across his career, suggesting he's always had a 6th sense for finding shooters in scoring position.
+
+It is no question that Kane had a tremendous 2018-2019 season. He handled the extra minutes with grace and had career highs in points, including a 5 point bout against the Washington Capitals on January 201th, 2019. However, he also recorded a high in giveaways and when controlling for his ice time, he did not score as many goals nor record as many points compared to his prior seasons. Therefore, I'm going to give Showtime an A- on the season. Kane is always looking to improve his game and we are excited for his return next season.
