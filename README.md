@@ -4,4 +4,10 @@ Any code that is featured in my [Blackhawk Up](https://blackhawkup.com/) posts w
 
 ## Published posts:
 
-+ [Chicago Blackhawks: analyzing Patrick Kane’s career scoring tendencies](https://blackhawkup.com/2019/04/09/chicago-blackhawks-patrick-kane-scoring/) -- see the `RMarkdown` [here](https://github.com/mkmiecik14/Blackhawk-Up/blob/master/post-blackhawkup-kane-career-scoring-1.Rmd) -- Published 09 April 2019
++ [Chicago Blackhawks: analyzing Patrick Kane’s career scoring tendencies](https://blackhawkup.com/2019/04/09/chicago-blackhawks-patrick-kane-scoring/)
+see the `RMarkdown` [here](https://github.com/mkmiecik14/Blackhawk-Up/blob/master/post-blackhawkup-kane-career-scoring-1.Rmd)
+Published 09 April 2019
+
++ Article link will go here when ready
+see the `RMarkdown` [here](https://github.com/mkmiecik14/Blackhawk-Up/blob/master/post-blackhawkup-kane-player-grade.Rmd)
+Published Date here when ready
