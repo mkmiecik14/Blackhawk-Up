@@ -8,6 +8,6 @@ Any code that is featured in my [Blackhawk Up](https://blackhawkup.com/) posts w
 see the `RMarkdown` [here](https://github.com/mkmiecik14/Blackhawk-Up/blob/master/post-blackhawkup-kane-career-scoring-1.Rmd)
 Published 09 April 2019
 
-+ Article link will go here when ready
++ [Chicago Blackhawks 2018-19 Player Grades: Patrick Kane](https://blackhawkup.com/2019/04/18/blackhawks-player-grades-patrick-kane/)
 see the `RMarkdown` [here](https://github.com/mkmiecik14/Blackhawk-Up/blob/master/post-blackhawkup-kane-player-grade.Rmd)
-Published Date here when ready
+Published 19 April 2019
