@@ -1,0 +1,62 @@
+---
+title: "Quenneville vs. Colliton: Comparing their first year coaching the Chicago Blackhawks"
+author: "Matt Kmiecik"
+output:
+  html_document:
+    highlight: zenburn
+    theme: journal
+---
+
+```{r setup, include=F}
+knitr::opts_chunk$set(echo = TRUE, 
+                      warning = FALSE, 
+                      message = FALSE,
+                      fig.align = "center",
+                      fig.path = "Quenneville-vs-Colliton/"
+                      )
+options(knitr.table.format = 'html') # For the html tables
+```
+
+These are the packages used for this analysis:
+
+```{r, pkgs}
+pkgs <- c("Hmisc", "tidyverse", "readxl", "RColorBrewer", "httr", "rsample", "broom", "datapasta")
+xfun::pkg_attach(pkgs)
+```
+
+Here is the color palette information and a table for nice plotting:
+
+```{r, colors}
+# Color palette
+rdgy_pal <- brewer.pal(11, "RdGy") # display.brewer.pal(11, "RdGy")
+```
+
+These data were acquired from hockey-reference.com and downloaded from this github repo. The preprocessing steps are outlined below:
+
+```{r, prepro}
+# Loading & prepping data ----
+# From: https://community.rstudio.com/t/read-xlsx-from-github/9386/3
+# See the above link for how I got the code to read in 
+# an Excel file into R from Github
+# github_link <- "https://github.com/mkmiecik14/Blackhawk-Up/blob/master/Data/pkane-career-stats.xlsx?raw=true"
+# temp_file <- tempfile(fileext = ".xlsx")
+# req <- GET(github_link, write_disk(path = temp_file))
+# 
+# pkane_data <- readxl::read_excel(temp_file)
+
+cdata <- read_excel("data/coachq-v-colliton.xlsx", sheet = "Sheet1")
+
+cdata1 <- cdata %>% filter(Coach %in% c("Joel Quenneville", "Jeremy Colliton"))
+```
+
+```{r, bootstrapping}
+set.seed(14) # Sets seed to receive same results on subsequent runs
+
+test <- bootstraps(cdata1, times = 10, strata = "Coach")
+
+
+```
+
+
+
+
