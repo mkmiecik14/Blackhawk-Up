@@ -1,0 +1,152 @@
+---
+title: "Quenneville vs. Colliton: Comparing their first year coaching the Chicago Blackhawks"
+author: "Matt Kmiecik"
+output:
+  html_document:
+    highlight: zenburn
+    theme: journal
+---
+
+```{r setup, include=F}
+knitr::opts_chunk$set(echo = TRUE, 
+                      warning = FALSE, 
+                      message = FALSE,
+                      fig.align = "center",
+                      fig.path = "Quenneville-vs-Colliton/"
+                      )
+options(knitr.table.format = 'html') # For the html tables
+```
+
+These are the packages used for this analysis:
+
+```{r, pkgs}
+pkgs <- c("Hmisc", "tidyverse", "readxl", "RColorBrewer", "httr")
+xfun::pkg_attach(pkgs)
+```
+
+Here is the color palette information and a table for nice plotting:
+
+```{r, colors}
+# Color palette
+rdgy_pal <- brewer.pal(11, "RdGy") # display.brewer.pal(11, "RdGy")
+```
+
+These data were acquired from hockey-reference.com and downloaded from this github repo. The preprocessing steps are outlined below:
+
+```{r, prepro}
+# Loading & prepping data ----
+# From: https://community.rstudio.com/t/read-xlsx-from-github/9386/3
+# See the above link for how I got the code to read in 
+# an Excel file into R from Github
+# github_link <- "https://github.com/mkmiecik14/Blackhawk-Up/blob/master/Data/pkane-career-stats.xlsx?raw=true"
+# temp_file <- tempfile(fileext = ".xlsx")
+# req <- GET(github_link, write_disk(path = temp_file))
+# 
+# pkane_data <- readxl::read_excel(temp_file)
+
+cdata <- read_excel("data/coachq-v-colliton.xlsx", sheet = "Sheet1") %>%
+  unite(Outcome_OT_SO, OT_SO, Outcome, remove = FALSE)
+
+colliton  <- cdata %>% filter(Coach == "Jeremy Colliton")
+coachq    <- cdata %>% filter(Coach == "Joel Quenneville") 
+
+games <- nrow(colliton) # Colliton coached 67 games
+
+# Drops final 26 games of Coach Q's first year
+coachq_matched <- coachq[1:games, ] 
+```
+
+```{r, bootstrapping}
+set.seed(14) # Sets seed to receive same results on subsequent runs
+boot_iters <- 2000
+boot_res <- vector("list", length = boot_iters)
+
+for(i in 1:boot_iters){
+  
+  booted <- bind_rows(
+  colliton %>% sample_frac(replace = TRUE),
+  coachq_matched %>% sample_frac(replace = TRUE)
+  )
+
+boot_res[[i]] <- booted %>%
+  group_by(Coach) %>%
+  summarise(
+    GF = sum(GF), 
+    GA = sum (GA), 
+    W = sum(Outcome=="W"), 
+    L = sum(Outcome=="L"),
+    OT_W = sum(Outcome_OT_SO=="OT_W"),
+    OT_L = sum(Outcome_OT_SO=="OT_L"),
+    SO_W = sum(Outcome_OT_SO=="SO_W"),
+    SO_L = sum(Outcome_OT_SO=="SO_L"),
+    Team_Shots = sum(Team_Shots),	
+    Team_PIM = sum(Team_PIM),
+    Team_PPG = sum(Team_PPG),
+    Team_SHG = sum(Team_SHG)
+    )
+  
+}
+
+boot_res_comb <- bind_rows(boot_res)
+boot_res_scaled <- boot_res_comb %>% mutate_if(is.numeric, scale)
+boot_res_scaled_long <- boot_res_scaled %>% gather(meas, value, -Coach)
+
+
+# Create df for naming
+meas_names <- tibble(
+  meas = unique(boot_res_scaled_long$meas),
+  new = c("Goals For", "Goals Against", 
+          "Wins", "Losses", "OT Wins", "OT Losses",
+          "Shootout Wins", "Shootout Losses", 
+          "Shots", "PIM", "PPG", "Short-handed Goals"
+          )
+  )
+
+boot_scaled <- left_join(boot_res_scaled_long, meas_names, by = "meas")
+
+ggplot(boot_scaled, aes(value, group = Coach, color = Coach)) +
+  geom_density() +
+  scale_color_manual(values = c(rdgy_pal[2], rdgy_pal[9])) +
+  theme_minimal() +
+  facet_wrap(~new) +
+  labs(
+    x = "Scaled Estimate (Z-Score)", 
+    y = "Density", 
+    caption = paste("Bootstrapped at", boot_iters, "iterations."),
+    title = "Simulation of each coach's first 67 games"
+    ) +
+  theme(legend.position = "bottom")
+
+cis <- boot_scaled %>% 
+  group_by(Coach, new) %>%
+  summarise(
+    m = mean(value),
+    sd = sd(value),
+    ll = quantile(value, probs = .025),
+    ul = quantile(value, probs = .975)
+    ) %>%
+  ungroup()
+
+# calculates mdiff for sorting
+diff <- cis %>% group_by(new) %>% summarise(mdiff = diff(m)) 
+cis_mdiff <- left_join(cis, diff, by = "new") 
+
+pd <- position_dodge(.4)
+ggplot(cis_mdiff, aes(reorder(new, -abs(mdiff)), m, group = Coach, color = Coach)) +
+  geom_point(position = pd) +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = .3, position = pd) +
+  coord_flip() +
+  labs(
+    x = "Scaled Estimate (Z-Score)", 
+    y = "Measure", 
+    caption = paste("Bootstrapped at", boot_iters, "iterations. Error bars are 95% CI."),
+    title = "Simulation of each coach's first 67 games"
+    ) +
+  scale_color_manual(values = c(rdgy_pal[2], rdgy_pal[9])) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+
+
+
