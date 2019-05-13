@@ -5,6 +5,8 @@ output:
   html_document:
     highlight: zenburn
     theme: journal
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=F}
@@ -31,44 +33,82 @@ Here is the color palette information and a table for nice plotting:
 rdgy_pal <- brewer.pal(11, "RdGy") # display.brewer.pal(11, "RdGy")
 ```
 
-These data were acquired from hockey-reference.com and downloaded from this github repo. The preprocessing steps are outlined below:
+On November 6, 2018, the Chicago Blackhawks relieved Coach Joel Quenneville of his duties and named Jeremy Colliton as their new head coach in an attempt to revitalize the team amidst a slow start to the 2018-2019 season. The change was a shock to the Blackhawks community and fanbase. Coach Q had become Chicago's steadfast leader and genius architect, constructing synergistic line combinations and masterfully adapting to player matchups throughout his 3 Stanley Cup winning tenure. Coach Q's decisions and persona both on and off the ice seemed to contribute so much to the Blackhawks success that it was difficult to see this team without him at the helm.
+
+Coach Colliton's start was at first concerning; however, success was gradual with players beginning to learn the Colliton system and adjust to this new coaching style. The powerplay seemed rejuvenated and several players recorded career high seasons. Unfortunately, the Blackhawks could not dig themselves out of the hole first excavated during the winter coaching change and their chances of making the playoffs waned into hopes for a successful off season.
+
+The question that this article attempts to address is whether this coaching change was beneficial to the Blackhawks? Admittedly, this question will require about 3 more years to answer, but a related question is whether Coach Colliton performed any differently in his first season (67 games) compared to when Coach Q was first given the nod in 2008. This serves as a decent comparison for performance, given that some factors are controlled for: team, city, a core group of players, front office dynamics, etc.
+
+Before getting to the analysis, let's look at some basic stats for each coach for their first 67 games coaching the Chicago Blackhawks:
+
+* Coach Q: 37 Wins, 30 Losses, 223 Goals For, 179 Goals Against, 2255 Team Shots, 932 PIM, 66 PPG
+* Coach Colliton: 30 Wins, 37 Losses, 224 Goals For, 236 Goals Against, 2177 Team Shots, 466 PIM, 41 PPG
+
+Coach Q performed better than Coach Colliton in Goals Against, Wins, Team Shots, and Team PPG, while performing worse in Goals For and Team PIM.
+
+However, can we say that these differences are statistically so? One method of evaluating this question is bootstrapping. Briefly, bootstrapping is when we take all the samples (games, in this case) and select at random with replacement as many games as we initially had samples (67), and compute the totals for that "season". We can repeat this procedure thousands of times to see the distributions of these estimates and how they change between coaches. In other words, if each coach were to coach the team thousands of times then what would be the results on average? The curious reader is encouraged to visit [here](https://mattkmiecik.shinyapps.io/boot-perm-dash/) to learn more about bootstrapping.
+
+Therefore, I performed bootstrapping to evaluate whether these differences are statistically reliable between Coach Q and Colliton in their first 67 games coaching the Blackhawks. The analysis that follows was performed on data retrieved from Hockey Reference and all `R` code is available on my [Github account](https://github.com/mkmiecik14/Blackhawk-Up).
+
+## Preprocessing
+<hr >
 
 ```{r, prepro}
 # Loading & prepping data ----
 # From: https://community.rstudio.com/t/read-xlsx-from-github/9386/3
 # See the above link for how I got the code to read in 
 # an Excel file into R from Github
-# github_link <- "https://github.com/mkmiecik14/Blackhawk-Up/blob/master/Data/pkane-career-stats.xlsx?raw=true"
-# temp_file <- tempfile(fileext = ".xlsx")
-# req <- GET(github_link, write_disk(path = temp_file))
-# 
-# pkane_data <- readxl::read_excel(temp_file)
+github_link <- "https://github.com/mkmiecik14/Blackhawk-Up/blob/master/Data/coachq-v-colliton.xlsx?raw=true"
 
-cdata <- read_excel("data/coachq-v-colliton.xlsx", sheet = "Sheet1") %>%
-  unite(Outcome_OT_SO, OT_SO, Outcome, remove = FALSE)
+temp_file <- tempfile(fileext = ".xlsx")
+req <- GET(github_link, write_disk(path = temp_file))
 
+cdata <- readxl::read_excel(temp_file, sheet = "Sheet1") %>%
+  unite(Outcome_OT_SO, OT_SO, Outcome, remove = FALSE) # Helps with OT/SO stats
+
+# Splits data frame into each coach
 colliton  <- cdata %>% filter(Coach == "Jeremy Colliton")
 coachq    <- cdata %>% filter(Coach == "Joel Quenneville") 
 
 games <- nrow(colliton) # Colliton coached 67 games
 
 # Drops final 26 games of Coach Q's first year
-coachq_matched <- coachq[1:games, ] 
+coachq_matched <- coachq[1:games, ]
+
+# Basic stats
+bind_rows(colliton, coachq_matched) %>%
+  group_by(Coach) %>%
+  summarise(
+    GF = sum(GF), 
+    GA = sum (GA), 
+    W = sum(Outcome=="W"), 
+    L = sum(Outcome=="L"),
+    OT_W = sum(Outcome_OT_SO=="OT_W"),
+    OT_L = sum(Outcome_OT_SO=="OT_L"),
+    SO_W = sum(Outcome_OT_SO=="SO_W"),
+    SO_L = sum(Outcome_OT_SO=="SO_L"),
+    Team_Shots = sum(Team_Shots),	
+    Team_PIM = sum(Team_PIM),
+    Team_PPG = sum(Team_PPG),
+    Team_SHG = sum(Team_SHG)
+    )
 ```
+
+## Bootstrapping procedure
+<hr >
 
 ```{r, bootstrapping}
 set.seed(14) # Sets seed to receive same results on subsequent runs
-boot_iters <- 2000
-boot_res <- vector("list", length = boot_iters)
+boot_iters <- 2000 # Sets the number of bootstrap iterations/simulations
+boot_res <- vector("list", length = boot_iters) # Preallocates list to store res
 
+# Bootstrapping procedure
 for(i in 1:boot_iters){
   
-  booted <- bind_rows(
+boot_res[[i]] <- bind_rows(
   colliton %>% sample_frac(replace = TRUE),
   coachq_matched %>% sample_frac(replace = TRUE)
-  )
-
-boot_res[[i]] <- booted %>%
+  ) %>%
   group_by(Coach) %>%
   summarise(
     GF = sum(GF), 
@@ -87,12 +127,12 @@ boot_res[[i]] <- booted %>%
   
 }
 
-boot_res_comb <- bind_rows(boot_res)
-boot_res_scaled <- boot_res_comb %>% mutate_if(is.numeric, scale)
-boot_res_scaled_long <- boot_res_scaled %>% gather(meas, value, -Coach)
+# Formatiing bootstrap results
+boot_res_comb <- bind_rows(boot_res) # Combines bootstrap res into one dataframe
+boot_res_scaled <- boot_res_comb %>% mutate_if(is.numeric, scale) # Z-Scores
+boot_res_scaled_long <- boot_res_scaled %>% gather(meas, value, -Coach) # Long
 
-
-# Create df for naming
+# Create df for easy ren-aming pf measures
 meas_names <- tibble(
   meas = unique(boot_res_scaled_long$meas),
   new = c("Goals For", "Goals Against", 
@@ -102,21 +142,40 @@ meas_names <- tibble(
           )
   )
 
+# Renames the measures
 boot_scaled <- left_join(boot_res_scaled_long, meas_names, by = "meas")
+```
 
+## Bootstrap Results
+<hr >
+
+After bootstrapping their metrics 2,000 times we can see that several of their measures overlap, while some of them show seperation in their distributions.
+
+```{r, bootres}
+# Bootstrap results - density plots
 ggplot(boot_scaled, aes(value, group = Coach, color = Coach)) +
   geom_density() +
   scale_color_manual(values = c(rdgy_pal[2], rdgy_pal[9])) +
   theme_minimal() +
   facet_wrap(~new) +
   labs(
-    x = "Scaled Estimate (Z-Score)", 
-    y = "Density", 
+    x = "\n Scaled Estimate (Z-Score)", 
+    y = "Density \n", 
     caption = paste("Bootstrapped at", boot_iters, "iterations."),
-    title = "Simulation of each coach's first 67 games"
+    title = "Each coach's first 67 games with the Blackhawks (bootstrap results)"
     ) +
   theme(legend.position = "bottom")
+```
 
+When reading this graph, separation in the distribution means that Coach Q and Colliton performed differently on that measure, while overlap suggests that there is no real difference. Therefore, we can see differences in Goals Against, PIM, and PPG, while significant overlap is seen in several other measures.
+
+## Confidence intervals
+<hr >
+
+To see whether these separations are statistically significant, we can compare their 95% confidence intervals. Briefly, a confidence interval indicates an upper and lower estimate in which we can be confident, to a certain specified level, that the true value lies within that interval. Here I'll be using 95% confidence intervals.
+
+```{r, ci}
+# Calculates 95% confidence intervals
 cis <- boot_scaled %>% 
   group_by(Coach, new) %>%
   summarise(
@@ -127,26 +186,29 @@ cis <- boot_scaled %>%
     ) %>%
   ungroup()
 
-# calculates mdiff for sorting
+# Calculates mean difference (miff) for sorting
 diff <- cis %>% group_by(new) %>% summarise(mdiff = diff(m)) 
 cis_mdiff <- left_join(cis, diff, by = "new") 
 
+# 95% CI plot
 pd <- position_dodge(.4)
 ggplot(cis_mdiff, aes(reorder(new, -abs(mdiff)), m, group = Coach, color = Coach)) +
   geom_point(position = pd) +
   geom_errorbar(aes(ymin = ll, ymax = ul), width = .3, position = pd) +
   coord_flip() +
   labs(
-    x = "Scaled Estimate (Z-Score)", 
-    y = "Measure", 
+    x = "Measure \n", 
+    y = "\n Scaled Estimate (Z-Score)", 
     caption = paste("Bootstrapped at", boot_iters, "iterations. Error bars are 95% CI."),
-    title = "Simulation of each coach's first 67 games"
+    title = "Each coach's first 67 games with the Blackhawks (95% CIs)"
     ) +
   scale_color_manual(values = c(rdgy_pal[2], rdgy_pal[9])) +
   theme_minimal() +
   theme(legend.position = "bottom")
 ```
 
+Again, we can interpret this plot similar to the one above: if the tails of the intervals do not touch then we can say that the coaches performed differently on the specified metric. As we can see, there is clear separation on PIM and a likely separation on Goals Against and PPG. The remainder of the estimates how overlap, suggesting no differences between Coach Q versus Colliton.
 
+The bottom line: during their first 67 games with the Blackhawks, Coach Q and Colliton performed differently on PIM and Goals Against. Coach Q had significantly more PIM, while less Goals Against than Coach Colliton. Coach Q also had much more PPG, but this difference trended towards significance. Remarkably, their Wins, Losses, Shots, and Goals For were not different.
 
-
+Although Coach Colliton demonstrated a much weaker defense than Coach Q, his team stayed out of the penalty box and performed very similar in several areas, including Goals For, Shots, Wins, and Losses. These results suggest that, despite Coach Colliton's poorer performing defence, he measured up to Coach Q quite well in his first 67 games. Nevertheless, Coach Colliton and his Blackhawks have some serious offseason work to do in cleaning up their defense and we are excited for their 2019-2020 return.
