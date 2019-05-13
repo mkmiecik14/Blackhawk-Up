@@ -20,7 +20,7 @@ options(knitr.table.format = 'html') # For the html tables
 These are the packages used for this analysis:
 
 ```{r, pkgs}
-pkgs <- c("Hmisc", "tidyverse", "readxl", "RColorBrewer", "httr", "rsample", "broom")
+pkgs <- c("Hmisc", "tidyverse", "readxl", "RColorBrewer", "httr")
 xfun::pkg_attach(pkgs)
 ```
 
