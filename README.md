@@ -12,4 +12,4 @@ Published 09 April 2019
 see the `RMarkdown` [here](https://github.com/mkmiecik14/Blackhawk-Up/blob/master/post-blackhawkup-kane-player-grade.Rmd)
 Published 19 April 2019
 
-+ Article link will appear here when published -- see the `RMarkdown` [here](https://github.com/mkmiecik14/Blackhawk-Up/blob/master/post-blackhawkup-coachq-vs-colliton.Rmd) Published DATE HERE
++ [Coach Q vs. Jeremy Colliton: First 67 Games As Blackhawks’ Head Coach](https://blackhawkup.com/2019/05/14/q-colliton-first-67-games-blackhawks-head-coach/) -- see the `RMarkdown` [here](https://github.com/mkmiecik14/Blackhawk-Up/blob/master/post-blackhawkup-coachq-vs-colliton.Rmd) Published 14 May 2019
