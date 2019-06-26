@@ -15,7 +15,7 @@ knitr::opts_chunk$set(
   warning = FALSE, 
   message = FALSE,
   fig.align = "center",
-  fig.path = "Pucks-to-the-Net"
+  fig.path = "Pucks-to-the-Net/"
   )
 options(knitr.table.format = 'html') # For the html tables
 ```
@@ -25,11 +25,26 @@ These are the packages used for this analysis:
 ```{r, pkgs}
 pkgs <- c("Hmisc", "tidyverse", "RColorBrewer", "RCurl", "broom")
 xfun::pkg_attach(pkgs)
+
+# Plotting essentials
+rdgy_pal <- brewer.pal(11, "RdGy") # display.brewer.pal(11, "RdGy")
 ```
 
-Retrieving the data:
+When watching game 7 of the Dallas and St. Louis playoff series this year I received a text from a friend of mine commenting on the sheer discrepancy of shots on goal between the teams. Throughout the game, it seemed that the Blues were tenacious in getting pucks on net, leaving Dallas scrambling for any semblance of a contending team. At the end of regulation, the Blues out-shot the Stars 41-17. Yet the game was tied up leading to a gripping 2 OT finale allowing a Stanley Cup Final berth for the Blues. 
 
-```{r}
+The question my friend had was simple, "How do shots on goal relate to goals?" Surely, due to sheer probability, teams that shoot on net more often should score more, right? It amazed me that the Blues weren't able to finish off their round 2 game 7 finale in regulation, especially with the shot discrepancy between the teams.
+
+We've all heard Eddie Olczyk comment endlessly about how it's never a bad idea to put the puck on net. Therefore, I sought to examine this relationship between putting pucks on net, which was measured by [Corsi For](https://en.wikipedia.org/wiki/Corsi_(statistic)) (Shots + Blocks + Misses), and scoring goals, which was measured by Goals For (number of scored goals), between the 2007-08 and 2018-19 regular seasons. I specifically wanted to see how the [Chicago Blackhawks](https://blackhawkup.com/) performed in relation to the rest of the NHL. 
+
+The analysis that follows was performed on data retrieved from [Corsica](http://www.corsica.hockey/) and all `R` code is available on my [Github account](https://github.com/mkmiecik14/Blackhawk-Up).
+
+A few notes about this analysis include:
+
+* Atlanta Thrashers and Winnipeg Jets data were considered as one team
+* Corsi For and Goals For data were adjusted for time on ice (TOI)
+* Las Vegas Knights data only reflects 2 seasons of play
+
+```{r prepro}
 # Loading & prepping data ----
 # data retrieved and downloaded from corsica.hockey on June 14 2019
 
@@ -39,42 +54,123 @@ github_link <- "https://raw.githubusercontent.com/mkmiecik14/Blackhawk-Up/master
 nhl_data <- read_csv(file = getURL(github_link)) %>% # retrieves data from github
   # edits name for WPG
   mutate(Team = ifelse(Team %in% c("ATL", "WPG"), "ATL.WPG", Team))
+```
 
+As a first pass, I examined each NHL team's total Corsi For and Goals For each season since 2007-2008:
+
+```{r shots}
 # Narrows down to essentials
 shot_data <- nhl_data %>% 
   select(Team, Season, TOI, CF, GF) %>%
-  mutate(CF_adj = CF/TOI, GF_adj = GF/TOI) # adjusting for TOI
+  mutate(
+    CF_adj = CF/TOI, # adjusting for TOI
+    GF_adj = GF/TOI, # adjusting for TOI
+    Hawks = ifelse(Team == "CHI", "Chicago Blackhawks", "Rest of NHL")
+    )
 
+# Scatter plots
+ggplot(shot_data, aes(CF_adj, GF_adj)) +
+  geom_point(aes(color = Hawks, size = Hawks)) +
+  geom_smooth(method = "lm", se = FALSE, color = "black", linetype = 1, alpha = 1/3) +
+  scale_color_manual(values = c(rdgy_pal[3], rdgy_pal[8])) +
+  scale_size_manual(values = c(2, 1.25)) +
+  guides(size = FALSE) +
+  labs(
+    x = "\n Corsi For (adjusted for TOI)",
+    y = "Goals For (adjusted for TOI) \n",
+    color = "Team",
+    title = "NHL Team-wise Relationships between Corsi For and Goals"
+  ) +
+  facet_wrap(~Season) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+The plot above depicts the relationship between Corsi For and Goals For as generally positive: an increase in Corsi For is associated with an increase in scored goals. We would expect this relationship as the more a team shoots the puck towards the net the more likely the puck is to elude the goaltender or create additional opportunities for the offense. Furthermore, the Blackhawks are often above the linear trend. This suggests that for the amount of shots they take per season, the Hawks' tend to score more than other teams on average (more on this later).
+
+Interestingly, the relationship between Corsi For and Goals For is stronger league-wide in some years than others. To quantify these relationship strengths for comparison, I ran 12 regressions--one for each season--that predicted Goals For as a function of the NHL teams' Corsi For. I then examined the regression coefficients by plotting them across time.
+
+```{r linmod}
 # Models GF ~ CF
 shot_data_mod <- shot_data %>%
   group_by(Season) %>%
   do(mod = lm(GF_adj ~ 1 + CF_adj, data = .))
+```
 
-shot_data_est <- shot_data_mod %>% tidy(mod) # retrieves estimates
+```{r estimates}
+# Retrieving model stuffs ----
+# retrieves estimates
+shot_data_est <- shot_data_mod %>% 
+  tidy(mod, conf.int = TRUE) %>% 
+  ungroup() %>%
+  mutate(sig = ifelse(conf.low < 0, "No", "Yes"))
 
+# Estimate plot
 ggplot(
   shot_data_est %>% filter(term %nin% "(Intercept)"),
   aes(Season, estimate)
   ) +
   geom_path(aes(group = 1), alpha = 1/3, linetype = 2) +
-  geom_point() +
+  geom_point(aes(color = sig)) +
   geom_errorbar(
-    aes(ymin = estimate - std.error, ymax = estimate + std.error),
+    aes(ymin = conf.low, ymax = conf.high, color = sig),
     width = .1
     ) +
-  theme_minimal()
-
-ggplot(nhl_data, aes(CF, GF)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = TRUE) +
-  facet_wrap(~Season) +
-  theme_minimal()
-
-
-
-
+  scale_color_manual(values = c(rdgy_pal[8], rdgy_pal[11])) +
+  labs(
+    x = "\n Season",
+    y = "Regression Coefficient \n",
+    caption = "95% CI error bars.",
+    color = "Significant Positive Association",
+    title = "Changes in Relationship Between Corsi For and Goals"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 15, hjust = 1),
+    legend.position = "bottom"
+    )
 ```
 
+The plot above observes a strong positive relationship between Corsi For and Goals For across recent seasons except the 2012-13 and 2017-18 campaigns, as these two seasons' 95% confidence intervals cross zero, suggesting a relationship that is not reliably positive. In general, it's a good idea to put the puck on net; however, why did some seasons not reliably demonstrate this? I'd love to hear your thoughts below.
 
+Now, how about our beloved Hawks? How did they fare in comparison to the rest of the league? 
+
+By examining each team's distance from the slope of the line in the first graph (called residuals), we can get an estimate of which teams are performing above and below the league average. In other words, which teams scored more goals than was expected of them given their Corsi For (adjusted for TOI)?
+
+To examine this, I averaged these distances for each team across their 12 most recent seasons. Teams with greater residuals mean that they are consistently scoring more goals per shot compared to the league average.
+
+```{r resids}
+# retrieves predicted values and residuals
+shot_data_aug <- shot_data_mod %>% 
+  augment(mod) %>% 
+  left_join(., shot_data, by = c("Season", "GF_adj", "CF_adj")) %>%
+  ungroup()
+
+# summarizes residuals for each team across yeat
+shot_data_aug_sum <- shot_data_aug %>% 
+  group_by(Team) %>% 
+  summarise(m = mean(.resid), sd = sd(.resid), n = n()) %>%
+  ungroup() %>%
+  mutate(Hawks = ifelse(Team == "CHI", "Chicago Blackhawks", "Rest of NHL"))
+
+# Resid plot
+ggplot(shot_data_aug_sum, aes(m, reorder(Team, m))) +
+  geom_point(aes(color = Hawks)) +
+  geom_errorbarh(aes(xmin = m-sd, xmax = m+sd, color = Hawks))+
+  scale_color_manual(values = c(rdgy_pal[3], rdgy_pal[9])) +
+  labs(
+    x = "Residuals",
+    y = "NHL Team",
+    caption = "SD error bars. \n * VGK has only 2 seasons of data",
+    title = "Team-wise Averaged Residuals from 2007-2019",
+    color = "Team"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+As we can see from the plot above, the Blackhawks are the 4th best team in the league from 2007-2019, with the Pittsburgh Penguins in 1st followed by Tampa Bay in 2nd and the Washington Capitals in 3rd. These top 4 teams separate themselves from the rest of the NHL and have generally performed well in the regular/post seasons, with Pittsburgh, Washington, and Chicago having Stanley Cup wins across the 2007-2019 seasons.
+
+Overall, getting pucks on net generally produces more goals; however, this relationship was not always true, especially for the 2012-2013 and 2017-2018 seasons. Furthermore, the Blackhawks have been rather efficient with their shooting across these 12 seasons, scoring more goals per shot than all but 3 teams in the league. The recent post-season acquisitions, such as [Calvin de Haan](https://blackhawkup.com/2019/06/24/blackhawks-breaking-down-calvin-de-haan-trade/), are very promising as the Hawks' hope to stay ahead of the curve with quality chances coming from not only their offense, but also from their blue line.
 
 
