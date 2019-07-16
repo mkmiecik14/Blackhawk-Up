@@ -46,15 +46,28 @@ all_live_data <- game_list %>%
   map_dfr(~ .x %>% select(-players) %>% jsonlite::flatten(), .id = "game_number")
 
 # Filter to only goals
-library(lubridate)
 all_goals <- all_live_data %>% 
   filter(result.event == "Goal") %>% 
   as_tibble() %>%
-  mutate(about.periodTime = as.period(ms(about.periodTime), unit = "sec")) # try a different method 
+  mutate(
+    about.periodTime = as.numeric(gsub(":", ".", all_goals$about.periodTime)),
+    team = ifelse(team.name == "Chicago Blackhawks", "Blackhawks", "NHL")
+    )
+   
 
-ggplot(all_goals %>% filter(about.period %in% c(1:3)), aes(about.periodTime)) +
+library(RColorBrewer)
+rdgy_pal <- brewer.pal(11, "RdGy")
+ggplot(
+  all_goals %>% filter(about.period %in% c(1:3)), 
+  aes(about.periodTime, group = team, color = team)
+  ) +
   geom_density() +
-  facet_wrap(~about.period)
+  geom_rug(alpha = 1/3) +
+  scale_color_manual(values = c(rdgy_pal[3], rdgy_pal[9])) +
+  labs(x = "Period Time", y = "Density") +
+  facet_wrap(~about.period) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
 
 
 
