@@ -62,11 +62,12 @@ ggplot(
   geom_density() +
   geom_rug(alpha = 1/3) +
   scale_color_manual(values = c(rdgy_pal[3], rdgy_pal[9])) +
-  labs(x = "Period Time", y = "Density") +
+  labs(x = "Period Time", y = "Density", title = "Scoring Density Across Each Period") +
   facet_wrap(~about.period) +
   theme_minimal() +
   theme(legend.position = "bottom")
 
+# Game-winning goals
 ggplot(
   all_reg_goals, 
   aes(about.periodTime, group = Team, color = Team)
@@ -79,16 +80,61 @@ ggplot(
   theme_minimal() +
   theme(legend.position = "bottom")
 
+# Tieing the game
+ggplot(
+  all_reg_goals %>% filter(about.goals.away == about.goals.home),
+  aes(about.periodTime, group = Team, color = Team)
+  ) +
+  geom_density() +
+  geom_rug(alpha = 1/3) +
+  scale_color_manual(values = c(rdgy_pal[3], rdgy_pal[9])) +
+  labs(x = "Period Time", y = "Density", title = "Scoring Density to Tie the Game") +
+  facet_wrap(~about.period) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+shot_type_counts <- all_reg_goals %>% group_by(Team) %>% count(result.secondaryType)
+
+ggplot(shot_type_counts %>% filter(n>1), aes(result.secondaryType, n, group = Team, fill = Team)) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  scale_fill_manual(values = c(rdgy_pal[3], rdgy_pal[9])) +
+  labs(x = "Shot Type", y = "Frequency", title = "Regulation Shot Totals per Type") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+all_reg_goals %>% count(Team)
+
+# OT
+all_ot_goals <- all_goals %>% filter(about.period == 4)
+
+ggplot(
+  all_ot_goals,
+  aes(about.periodTime, group = Team, color = Team)
+  ) +
+  geom_density() +
+  geom_rug(alpha = 1/3) +
+  scale_color_manual(values = c(rdgy_pal[3], rdgy_pal[9])) +
+  labs(x = "Period Time", y = "Density", title = "Overtime Scoring Density") +
+  facet_wrap(~about.period) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+all_ot_goals %>% count(Team)
+
+
 # https://community.rapidminer.com/discussion/44904/using-the-nhl-api-to-analyze-pro-ice-hockey-data-part-1
 
-
-rink_outline <- geom_vline(xintercept = 25, color = "blue")
+# Shot maps
+blue_line <- geom_vline(xintercept = 25, color = "blue")
+red_line <- geom_vline(xintercept = 89, color = "red")
+red_dot_1 <- geom_polygon() # 5 feet behind blue line and 22 feet from center
 
 ggplot(
   all_reg_goals,
   aes(sqrt(coordinates.x^2), coordinates.y, group = Team, color = result.secondaryType)
   ) +
-  rink_outline +
+  blue_line + red_line +
   geom_point(aes(shape = Team)) +
   #facet_wrap(~result.secondaryType) +
   theme_classic() +
