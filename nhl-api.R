@@ -5,12 +5,10 @@
 library(httr)
 library(jsonlite)
 library(tidyverse)
+library(RColorBrewer)
 
 
 # https://gitlab.com/dword4/nhlapi/blob/master/stats-api.md#game-ids
-# API Link
-api_base <- "https://statsapi.web.nhl.com"
-api_link <- "https://statsapi.web.nhl.com/api/v1/teams"
 
 # Function to retrive api data and clean
 nhl_api <- function(link){
@@ -21,14 +19,10 @@ nhl_api <- function(link){
 
 # Blackhawks 2018-2019 schedule (doing this to get game ID)
 schedule_link <- "https://statsapi.web.nhl.com/api/v1/schedule?teamId=16&startDate=2018-10-01&endDate=2019-07-01"
-
 schedule_data <- nhl_api(schedule_link) # retrieves schedule data
-
 games_data <- schedule_data$dates$games # grabs games data
 games_data_flat <- map_dfr(games_data, jsonlite::flatten) # flattens nested dfs
-
-# THESE ARE THE HAWKS GAME IDs FOR 2018-2019
-hawks_games <- games_data_flat$gamePk
+hawks_games <- games_data_flat$gamePk # THESE ARE THE HAWKS GAME IDs FOR 2018-2019
 
 # Live Feed #
 
@@ -39,6 +33,7 @@ game_links <- hawks_games %>%
 # Using these above links, the api makes the calls for all 82 games
 game_list <- game_links %>% map(~ nhl_api(.x))
 
+# Extracts play data
 all_live_data <- game_list %>%
   map("liveData") %>%
   map("plays") %>%
@@ -50,16 +45,19 @@ all_goals <- all_live_data %>%
   filter(result.event == "Goal") %>% 
   as_tibble() %>%
   mutate(
-    about.periodTime = as.numeric(gsub(":", ".", all_goals$about.periodTime)),
-    team = ifelse(team.name == "Chicago Blackhawks", "Blackhawks", "NHL")
+    about.periodTime = as.numeric(gsub(":", ".", about.periodTime)),
+    Team = ifelse(team.name == "Chicago Blackhawks", "Blackhawks", "NHL")
     )
    
+# Filtering to only look at regulation goals
+all_reg_goals <- all_goals %>% filter(about.period %in% c(1:3))
 
-library(RColorBrewer)
-rdgy_pal <- brewer.pal(11, "RdGy")
+
+rdgy_pal <- brewer.pal(11, "RdGy") # color palette
+
 ggplot(
-  all_goals %>% filter(about.period %in% c(1:3)), 
-  aes(about.periodTime, group = team, color = team)
+  all_reg_goals, 
+  aes(about.periodTime, group = Team, color = Team)
   ) +
   geom_density() +
   geom_rug(alpha = 1/3) +
@@ -69,65 +67,30 @@ ggplot(
   theme_minimal() +
   theme(legend.position = "bottom")
 
+ggplot(
+  all_reg_goals, 
+  aes(about.periodTime, group = Team, color = Team)
+  ) +
+  geom_density() +
+  geom_rug(alpha = 1/3) +
+  scale_color_manual(values = c(rdgy_pal[3], rdgy_pal[9])) +
+  labs(x = "Period Time", y = "Density") +
+  facet_grid(result.gameWinningGoal~about.period) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# https://community.rapidminer.com/discussion/44904/using-the-nhl-api-to-analyze-pro-ice-hockey-data-part-1
 
 
+rink_outline <- geom_vline(xintercept = 25, color = "blue")
 
-
-# game_id <- 2017020001
-# game_link <- paste0(
-#   "https://statsapi.web.nhl.com/api/v1/game/", 
-#   game_id,
-#   "/feed/live"
-#   )
-# live_data <- nhl_api(link = game_link)
-# 
-# # IDs for all plays
-# all_plays <- live_data$liveData$plays$allPlays
-# 
-# # Isolates play ID for scoring plays
-# scoring_plays <- live_data$liveData$plays$scoringPlays
-# 
-# # Gathers data
-# scoring_data <- all_plays %>% 
-#   select(-players) %>% 
-#   jsonlite::flatten(.) %>% # flattens nested dataframes
-#   filter(about.eventIdx %in% scoring_plays) # filters to goals
-
-
-
-
-
-
-
-
-
-
-
-# time_data <- jsonlite::flatten(all_plays$about) %>% 
-#   filter(eventId %in% scoring_plays) %>% 
-#   as_tibble()
-# 
-# # RESULTS
-# # this will have shot type, strenth, description, game winning goal, empty net
-# desc_data <- jsonlite::flatten(all_plays$result[scoring_plays+1,]) %>% 
-#   rownames_to_column(., var = "eventId") %>%
-#   as_tibble(.) %>%
-#   mutate(eventId = as.numeric(eventId), eventId = eventId - 1) # corrects
-# 
-# # COORDINATES
-# # Should provide the coordinates of the goal; however, the rowname seems 1 off from id
-# coord_data <- jsonlite::flatten(all_plays$coordinates[scoring_plays+1,]) %>%
-#   rownames_to_column(., var = "eventId") %>%
-#   as_tibble() %>%
-#   mutate(eventId = as.numeric(eventId), eventId = eventId - 1) # corrects
-# 
-# # TEAM
-# # Data about the team that scored
-# team_data <- jsonlite::flatten(all_plays$team[scoring_plays+1,]) %>% 
-#   rownames_to_column(., var = "eventId") %>%
-#   as_tibble(.) %>%
-#   mutate(eventId = as.numeric(eventId), eventId = eventId - 1) # corrects
-#   
-# scoring_data <- bind_cols(time_data, desc_data, coord_data, team_data)
-
+ggplot(
+  all_reg_goals,
+  aes(sqrt(coordinates.x^2), coordinates.y, group = Team, color = result.secondaryType)
+  ) +
+  rink_outline +
+  geom_point(aes(shape = Team)) +
+  #facet_wrap(~result.secondaryType) +
+  theme_classic() +
+  theme(legend.position = "bottom")
 
