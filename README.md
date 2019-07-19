@@ -4,7 +4,7 @@ Any code that is featured in my [Blackhawk Up](https://blackhawkup.com/) article
 
 ## Published posts:
 
-+ [Chicago Blackhawks: Scoring Density Analysis for the 2018-2019 Season]() -- see the `RMarkdown` [here](https://github.com/mkmiecik14/Blackhawk-Up/blob/master/post-scoring-density-analysis-2018-2019.Rmd) Published date here
++ [Chicago Blackhawks: Scoring Density Analysis for the 2018-2019 Season](https://blackhawkup.com/2019/07/19/chicago-blackhawks-scoring-density-analysis-2018-2019-season/) -- see the `RMarkdown` [here](https://github.com/mkmiecik14/Blackhawk-Up/blob/master/post-scoring-density-analysis-2018-2019.Rmd) Published 19 July 2019
 
 + [Chicago Blackhawks: An Efficient Offensive Machine](https://blackhawkup.com/2019/06/27/chicago-blackhawks-efficient-offensive-machine/) -- see the `RMarkdown` [here](https://github.com/mkmiecik14/Blackhawk-Up/blob/master/post-blackhawkup-pucks-to-the-net.Rmd) Published 27 June 2019
 
